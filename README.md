@@ -12,7 +12,6 @@ This project is a static recompilation of the unreleased *IMSA presents World Ch
   <img src="packaging/readme/screenshot3.png" width="250" alt="IMSA screenshot 3" />
 </p>
 
----
 
 ## Quick Start
 
@@ -32,8 +31,6 @@ cmake --build build --parallel 4
 ./build/host/m2host
 ```
 
----
-
 ## Updating
 
 Saves, launcher settings and the game files extracted from your disc are kept apart from the program, so an update never needs your disc again.
@@ -45,7 +42,6 @@ Saves, launcher settings and the game files extracted from your disc are kept ap
 | Windows `.zip` | Extract the new version, copy the old `userdata` folder into it | `userdata` in the package folder |
 | Linux `.tar.gz` | Extract the new version, copy the old `userdata` folder into it | `userdata` in the package folder |
 
----
 
 ## About the Project
 
@@ -64,7 +60,6 @@ The goals of this project were:
 
 In addition, this repo contains a large amount of documentation of the internal game and 3DO M2 based on the research completed. View the documentation map at [docs/README.md](docs/README.md).
 
----
 
 ## Credits & Special Thanks
 
@@ -77,7 +72,6 @@ In addition, this repo contains a large amount of documentation of the internal 
 - **Original Development Team**: See [ORIGINAL_CREDITS.md](ORIGINAL_CREDITS.md).
 - Additional references used were patent [WO1996036011A1](https://patents.google.com/patent/WO1996036011A1) (Triangle Engine), [PowerPC 602 User's Manual](https://zxgit.org/RomanRom2/awesome-cpus/raw/commit/8115b6c97d547c13037b0cfcb0125d09a3e90543/PowerPC/PowerPC_602/manual.pdf), and [NXP PowerPC Floating-Point Documentation](https://www.nxp.com/docs/en/user-guide/MPCFPE_AD_R1.pdf).
 
----
 
 ## License
 

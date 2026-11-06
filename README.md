@@ -1,13 +1,15 @@
 # IMSA presents World Championship Racing & shooter2d Recomp (`imsa-wcr-m2-recomp`)
 
-![IMSA presents World Championship Racing](packaging/readme/IMSA_appbanner_M2_ABANR_640x240.png)
+<p align="center">
+    <img src="packaging/readme/IMSA_appbanner_M2_ABANR_640x240.png" alt="banner" />
+</p>
 
 This project is a static recompilation of the unreleased *IMSA presents World Championship Racing* and its on-disk companion game *shooter2d* for the unreleased Panasonic M2. This recomp has been designed to be as faithful to the original experience as possible while stopping short of being an emulator.
 
 <p align="center">
-  <img src="packaging/readme/screenshot1.png" width="280" alt="IMSA screenshot 1" />
-  <img src="packaging/readme/screenshot2.png" width="280" alt="IMSA screenshot 2" />
-  <img src="packaging/readme/screenshot3.png" width="280" alt="IMSA screenshot 3" />
+  <img src="packaging/readme/screenshot1.png" width="250" alt="IMSA screenshot 1" />
+  <img src="packaging/readme/screenshot2.png" width="250" alt="IMSA screenshot 2" />
+  <img src="packaging/readme/screenshot3.png" width="250" alt="IMSA screenshot 3" />
 </p>
 
 ---

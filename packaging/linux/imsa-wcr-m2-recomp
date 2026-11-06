@@ -1,0 +1,4 @@
+#!/bin/sh
+# Start the launcher from the package folder holding this script.
+here=$(dirname "$(readlink -f "$0")")
+exec "$here/bin/m2launcher" "$@"

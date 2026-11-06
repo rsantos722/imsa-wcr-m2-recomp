@@ -1,0 +1,12 @@
+# LF on every platform.
+* text=auto eol=lf
+
+# Windows-only scripts keep their native line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files that are legitimately tracked (icons, etc.).
+*.png binary
+*.ico binary
+*.icns binary

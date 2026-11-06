@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=IMSA WCR M2 Recomp Launcher
+Comment=Set up and launch IMSA WCR M2 Recomp
+Exec=m2launcher
+Icon=imsa-wcr-m2-recomp
+Terminal=false
+Categories=Game;
+StartupNotify=true
+StartupWMClass=m2launcher

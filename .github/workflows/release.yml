@@ -1,0 +1,211 @@
+name: Package Check
+
+# Manual workflow to verify CPack packaging across Linux, macOS, and Windows.
+# Real release packages are built locally by maintainers with the game disc.
+# This workflow verifies the packaging targets and artifacts without publishing.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 keeps the AppImage runnable on glibc 2.35 and newer.
+          # It only packages wxWidgets 3.0, so the launcher links a static 3.2
+          # built from source on the runner instead.
+          - name: Linux x86_64
+            os: ubuntu-22.04
+            generator: Unix Makefiles
+            cmake_args: -DIMSA_LAUNCHER_FETCH_WXWIDGETS=ON
+          - name: macOS arm64
+            os: macos-latest
+            generator: Unix Makefiles
+          - name: macOS x86_64
+            os: macos-15-intel
+            generator: Unix Makefiles
+          - name: Windows x86_64
+            os: windows-latest
+            msys2: true
+            generator: Ninja
+    name: Package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.msys2 && 'msys2 {0}' || 'bash' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (UCRT64)
+        if: matrix.msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pytest
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-python-numpy
+            mingw-w64-ucrt-x86_64-python-capstone
+            mingw-w64-ucrt-x86_64-sdl3
+            mingw-w64-ucrt-x86_64-wxwidgets3.2
+            mingw-w64-ucrt-x86_64-nasm
+            make
+            diffutils
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sdl3 pytest wxwidgets nasm pillow numpy
+          python3 -m pip install --break-system-packages -r recompiler/requirements.txt
+      - name: Install Python (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libgl-dev libpng-dev libjpeg-dev nasm file
+          python -m pip install -r tools/requirements.txt -r tests/tools/requirements.txt -r recompiler/requirements.txt
+      - name: Install SDL3 (Linux)
+        if: runner.os == 'Linux'
+        uses: libsdl-org/setup-sdl@v1
+        with:
+          version: "3-latest"
+          install-linux-dependencies: true
+
+      # Distribution FFmpeg builds enable GPL components. Bundle this LGPL
+      # build of the pinned upstream release instead; see packaging/ffmpeg.
+      - name: Cache FFmpeg (LGPL)
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-lgpl
+          key: ffmpeg-lgpl-${{ matrix.os }}-${{ hashFiles('packaging/ffmpeg/build-ffmpeg.sh') }}
+      - name: Build FFmpeg (LGPL)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: packaging/ffmpeg/build-ffmpeg.sh "$PWD/ffmpeg-lgpl"
+      - name: Locate FFmpeg
+        run: echo "IMSA_FFMPEG_ROOT=$(cd ffmpeg-lgpl && (cygpath -m "$PWD" 2>/dev/null || pwd))" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G "${{ matrix.generator }}"
+          -DCMAKE_BUILD_TYPE=Release
+          -DIMSA_FFMPEG_ROOT="$IMSA_FFMPEG_ROOT"
+          ${{ matrix.cmake_args }}
+      # ImsaPackaging.cmake skips packaging, without failing, when the
+      # launcher target is missing (no wxWidgets found).
+      - name: Check packaging is enabled
+        run: |
+          if [ ! -f build/CPackConfig.cmake ]; then
+            echo "::error::Packaging is disabled: configure found no m2launcher (wxWidgets missing?)"
+            exit 1
+          fi
+      - name: Build
+        run: cmake --build build --parallel 4
+      - name: Tests
+        # Windows finds the FFmpeg DLLs through PATH; elsewhere this is harmless.
+        run: |
+          export PATH="$PWD/ffmpeg-lgpl/bin:$PATH"
+          ctest --test-dir build --output-on-failure -C Release --parallel 4
+
+      - name: Package
+        run: cpack --config build/CPackConfig.cmake -C Release -B dist
+
+      - name: Check package layout (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          set -e
+          # Paths inside the ZIP, without its top folder.
+          (cd dist && cmake -E tar tf ./*.zip) | sed 's|^[^/]*/||' > layout.txt
+          cat layout.txt
+          top=$(grep -v '/' layout.txt | grep -v '^$' | sort | tr '\n' '|')
+          if [ "$top" != "IMSA WCR M2 Recomp.exe|README.txt|" ]; then
+            echo "::error::Unexpected files at the top of the package: $top"
+            exit 1
+          fi
+          grep -qx 'bin/m2launcher.exe' layout.txt
+          grep -qx 'bin/m2host.exe' layout.txt
+          grep -qx 'bin/portable.txt' layout.txt
+          grep -qx 'userdata/README.txt' layout.txt
+          if grep -i '\.dll$' layout.txt | grep -qv '^bin/'; then
+            echo "::error::Found DLLs outside bin"
+            exit 1
+          fi
+      - name: Check package layout (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          # Paths inside the tar.gz, without its top folder.
+          tar tzf dist/*.tar.gz | sed 's|^[^/]*/||' > layout.txt
+          cat layout.txt
+          top=$(grep -v '/' layout.txt | grep -v '^$' | LC_ALL=C sort | tr '\n' '|')
+          if [ "$top" != "README.txt|imsa-wcr-m2-recomp|" ]; then
+            echo "::error::Unexpected files at the top of the package: $top"
+            exit 1
+          fi
+          grep -qx 'bin/m2launcher' layout.txt
+          grep -qx 'bin/m2host' layout.txt
+          grep -qx 'bin/portable.txt' layout.txt
+          grep -qx 'userdata/README.txt' layout.txt
+          grep -qx 'licenses/LICENSE' layout.txt
+          if grep -q '^share/doc/' layout.txt; then
+            echo "::error::The tar.gz contains the system install's share/doc"
+            exit 1
+          fi
+          # A plain install, which the AppImage is built from, must stay free
+          # of the portable files.
+          cmake --install build --prefix "$PWD/plain-install"
+          for f in bin/portable.txt userdata README.txt imsa-wcr-m2-recomp licenses; do
+            if [ -e "plain-install/$f" ]; then
+              echo "::error::A plain install contains the portable file $f"
+              exit 1
+            fi
+          done
+          test -f plain-install/share/doc/imsa-wcr-m2-recomp/LICENSE
+      - name: Install linuxdeploy (Linux)
+        if: runner.os == 'Linux'
+        env:
+          LINUXDEPLOY_TAG: 1-alpha-20251107-1
+          GTK_PLUGIN_COMMIT: 7a3fbc31a9e5075073ff8790f26effbac5f84453
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSL -o "$HOME/bin/linuxdeploy" \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-x86_64.AppImage"
+          curl -fsSL -o "$HOME/bin/linuxdeploy-plugin-gtk" \
+            "https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/$GTK_PLUGIN_COMMIT/linuxdeploy-plugin-gtk.sh"
+          chmod +x "$HOME/bin/linuxdeploy" "$HOME/bin/linuxdeploy-plugin-gtk"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Build AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: packaging/appimage/build-appimage.sh build dist
+
+      - name: Checksums
+        run: |
+          cd dist
+          for f in *.zip *.dmg *.tar.gz *.AppImage; do
+            [ -e "$f" ] || continue
+            sha256sum "$f" > "$f.sha256" 2>/dev/null || shasum -a 256 "$f" > "$f.sha256"
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ strategy.job-index }}
+          path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/*.tar.gz
+            dist/*.AppImage
+            dist/*.sha256
+          if-no-files-found: error

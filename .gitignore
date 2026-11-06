@@ -1,0 +1,105 @@
+# --- Game data and anything derived from it: never committed ---
+/extracted/
+/disc/
+/discs/
+/generated/
+/game-data/
+/assets/
+/decoded_assets/
+/converted/
+*.iso
+*.IMG
+*.cue
+*.cbd2
+*.bin
+*.BIN
+*.spt
+tweek.dat
+*.wav
+*.ogg
+*.mov
+*.memimage
+*.qmf
+*.imsasound
+*.utf
+*.txp
+*.cel
+*.pdf
+*.zip
+
+# --- Build output ---
+/build*/
+/out/
+/dist/
+/host/build/
+/Testing/
+/_CPack_Packages/
+/CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/CTestTestfile.cmake
+/Makefile
+CMakeUserPresets.json
+compile_commands.json
+*.o
+*.obj
+*.a
+*.lib
+*.exe
+*.dll
+*.dylib
+*.so
+*.pdb
+*.dSYM/
+
+# --- Captures and diagnostic output ---
+*.ppm
+*.bmp
+*.ndjson
+/screenshots/
+/provenance.json
+# Savestates contain the full guest RAM, including the game image.
+*.state
+*.state.tmp
+/saves/
+/userdata/
+
+# --- Local configuration ---
+m2host.cfg
+m2host-input.cfg
+.env
+RELEASE_GUIDE.md
+
+# --- Python ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editors / IDE ---
+.idea/
+.vscode/
+.cache/
+*.swp
+
+# --- Local agent and tool caches ---
+.agent-artifacts/
+.agents/
+.commandcode/
+.freebuff/
+.opencode/
+.omp/
+Ghidra/
+*.gpr
+*.rep
+
+# --- Vendored SDK/reference trees: never committed ---
+/vendor/

@@ -1,0 +1,131 @@
+name: CI
+
+# Docs-only changes skip CI. environment.md stays in: test_env_reference fails
+# when that generated page goes stale.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**'
+      - '!**.md'
+      - '!docs/**'
+      - 'docs/recompilation/environment.md'
+  pull_request:
+    paths:
+      - '**'
+      - '!**.md'
+      - '!docs/**'
+      - 'docs/recompilation/environment.md'
+
+# A newer push to the same branch or PR cancels the run it supersedes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            generator: Ninja
+          - name: macOS
+            os: macos-latest
+            generator: Unix Makefiles
+          - name: Windows
+            os: windows-latest
+            msys2: true
+            generator: Ninja
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+      # Hosted runners reinstall the compiler each run, so its mtime changes.
+      CCACHE_COMPILERCHECK: content
+    defaults:
+      run:
+        shell: ${{ matrix.msys2 && 'msys2 {0}' || 'bash' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up MSYS2 (UCRT64)
+        if: matrix.msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pytest
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-python-numpy
+            mingw-w64-ucrt-x86_64-python-capstone
+            mingw-w64-ucrt-x86_64-sdl3
+            mingw-w64-ucrt-x86_64-wxwidgets3.2
+            mingw-w64-ucrt-x86_64-ccache
+            mingw-w64-ucrt-x86_64-nasm
+            make
+            diffutils
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sdl3 pytest wxwidgets ffmpeg pillow numpy ccache
+          python3 -m pip install --break-system-packages -r recompiler/requirements.txt
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-pytest python3-pil python3-numpy libwxgtk3.2-dev libavcodec-dev libavutil-dev libgl-dev ninja-build ccache
+          python3 -m pip install --break-system-packages -r recompiler/requirements.txt
+      - name: Install SDL3 (Linux)
+        if: runner.os == 'Linux'
+        uses: libsdl-org/setup-sdl@v1
+        with:
+          version: "3-latest"
+          install-linux-dependencies: true
+      # The MSYS2 ffmpeg package pulls in most of a 2.4 GB dependency tree. Use
+      # the minimal build release packages bundle; see packaging/ffmpeg.
+      - name: Cache FFmpeg (LGPL)
+        id: ffmpeg-cache
+        if: matrix.msys2
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-lgpl
+          key: ffmpeg-lgpl-${{ matrix.os }}-${{ hashFiles('packaging/ffmpeg/build-ffmpeg.sh') }}
+      - name: Build FFmpeg (LGPL)
+        if: matrix.msys2 && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: packaging/ffmpeg/build-ffmpeg.sh "$PWD/ffmpeg-lgpl"
+      - name: Locate FFmpeg
+        if: matrix.msys2
+        run: echo "IMSA_FFMPEG_ROOT=$(cd ffmpeg-lgpl && cygpath -m "$PWD")" >> "$GITHUB_ENV"
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.os }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.os }}-
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G "${{ matrix.generator }}"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          ${IMSA_FFMPEG_ROOT:+-DIMSA_FFMPEG_ROOT="$IMSA_FFMPEG_ROOT"}
+      - name: Build
+        run: |
+          ccache --zero-stats
+          cmake --build build --parallel 4
+          ccache --show-stats
+      - name: Verify launcher was built
+        if: runner.os == 'Windows'
+        run: test -f build/launcher/m2launcher.exe
+      - name: Tests
+        # Every test uses a private scratch directory, so they can run
+        # concurrently; hosted runners have 4 vCPUs. Windows finds the FFmpeg
+        # DLLs through PATH.
+        run: |
+          if [ -n "$IMSA_FFMPEG_ROOT" ]; then export PATH="$PWD/ffmpeg-lgpl/bin:$PATH"; fi
+          ctest --test-dir build --output-on-failure -C Release --parallel 4

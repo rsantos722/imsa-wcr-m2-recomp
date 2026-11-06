@@ -1,0 +1,152 @@
+Third-party notices
+===================
+
+This project is released under the MIT License (see `LICENSE`). It links or
+contains the third-party components listed below. Full license texts are kept
+with the component or under `third_party/licenses/`.
+
+SDL3 3.4+
+---------
+Window creation, input, audio output, and OpenGL context management. Linked
+as a shared library; this project does not modify SDL.
+
+License: zlib
+Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
+
+This software is provided 'as-is', without any express or implied warranty.
+In no event will the authors be held liable for any damages arising from the
+use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim
+   that you wrote the original software. If you use this software in a
+   product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
+
+Source: https://github.com/libsdl-org/SDL
+
+
+FFmpeg (libavcodec, libavutil)
+------------------------------
+Optional. The MPEG-1 still-image and FMV decoders link the shared
+`libavcodec` and `libavutil`. This project does not modify FFmpeg and does not
+carry FFmpeg source in this tree.
+
+License: LGPL-2.1-or-later. Source builds link whichever FFmpeg is installed,
+and the applicable license is that build's: distribution builds that enable
+`--enable-gpl` are GPL-2.0-or-later.
+
+Release packages bundle FFmpeg 9.0.2 built by `packaging/ffmpeg/build-ffmpeg.sh`
+from the unmodified upstream source tarball
+(https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz, SHA-256
+`8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`). The build
+is shared and LGPL only: neither `--enable-gpl`, `--enable-version3` nor
+`--enable-nonfree` is set, nothing is auto-detected, and only the MPEG-1 video
+and MPEG audio layer II decoders and parsers are compiled in. The libraries
+are shipped as separate files (`libavcodec`, `libavutil`, `libswresample`
+where present), so they can be replaced with a build of your own made from the
+same source. `FFMPEG_SOURCE.txt` in each package names the source tarball.
+
+Full LGPL-2.1 text: `third_party/licenses/LGPL-2.1.txt`
+Source: https://ffmpeg.org/
+
+
+wxWidgets 3.2+
+--------------
+Optional. Used by the desktop launcher when system wxWidgets is available, or
+built from source when configured with `-DIMSA_LAUNCHER_FETCH_WXWIDGETS=ON`.
+This project does not modify wxWidgets.
+
+License: wxWindows Library Licence, version 3.1, which is the GNU Library
+General Public License version 2 (or later) plus an exception that permits
+distributing binary object code under your own terms.
+
+Full text: `third_party/licenses/wxWindows-3.1.txt`
+Source: https://www.wxwidgets.org/
+
+
+stb_vorbis 1.22
+---------------
+Compiled into the host audio library for Ogg Vorbis decoding.
+
+License: dual MIT / public domain. Full text:
+`third_party/stb_vorbis_LICENSE.txt`
+Source: https://github.com/nothings/stb
+
+
+Portfolio OS LZSS decompressor
+------------------------------
+Code derived from the Portfolio OS source archive, not linked.
+`tools/m2_lzss.py` and `tools/decode_kernel_opera.py` contain Python ports of
+`FeedDecompressor` from `ws_root/src/folios/compression/decompress.c`
+(commit 3d68c03).
+
+License: the archive publishes no license file.
+Source: https://github.com/trapexit/portfolio_os_m2
+
+
+Capstone 5.0.7
+--------------
+Build-time only. The recompiler (`recompiler/transpile.py`) uses the Capstone
+Python package for PowerPC disassembly. It is installed from PyPI as pinned in
+`recompiler/requirements.txt`; it is not linked, not carried in this tree, and
+not shipped in release packages.
+
+License: BSD-3-Clause
+Copyright (c) 2013, COSEINC.
+Source: https://www.capstone-engine.org/
+
+
+MAME (Konami M2 Triangle Engine model)
+--------------------------------------
+Code derived from MAME, not linked. `host/graphics/te_vertex_state.h` is a
+C++ adaptation of `m2_te_device::add_vertex()` from
+`src/mame/konami/3dom2_te.cpp`. MAME is otherwise used only as a behavioral
+reference; no other MAME source is
+included.
+
+License: BSD-3-Clause
+Copyright (c) Philip Bennett
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Source: https://github.com/mamedev/mame
+
+
+Libraries bundled with wxWidgets and SDL3
+-----------------------------------------
+Packages that bundle wxWidgets or SDL3 also carry the shared libraries those
+depend on in that build (for example libpng, libjpeg, libtiff, libwebp, zstd,
+PCRE2 and xz on macOS). They are unmodified and keep their own permissive
+licenses; the file listing of each package shows which ones it contains.

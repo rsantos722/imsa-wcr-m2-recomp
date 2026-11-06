@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a bug or issue you had
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please **do not attach game data**. Logs are fine.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Launch the game
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - IMSA World Championship Racing
+        - shooter2d
+        - Launcher
+        - Not sure
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release version, or the git commit if you built it yourself.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Settings and environment variables
+      description: Any specific settings that may be related to the issue
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output / logs
+      render: text

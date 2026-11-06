@@ -1,0 +1,1 @@
+This file tells the game to keep its saves and settings in the userdata folder of this package.

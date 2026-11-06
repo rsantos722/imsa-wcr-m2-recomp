@@ -21,6 +21,14 @@ trap 'rm -rf "$(dirname "$appdir")"' EXIT
 # saves and settings in the user's data folder.
 cmake --install "$build_dir" --prefix "$appdir/usr"
 
+# The bundled LGPL FFmpeg libraries have no RUNPATH, so linuxdeploy cannot find
+# libavutil next to libavcodec on its own. Point it at the installed copies,
+# not a system FFmpeg.
+ffmpeg_lib_dir=$(dirname "$(find "$appdir/usr" -name 'libavutil.so.*' -print -quit)")
+if [ "$ffmpeg_lib_dir" != "." ]; then
+    export LD_LIBRARY_PATH="$ffmpeg_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 mkdir -p "$out_dir"
 out_dir=$(cd "$out_dir" && pwd)
 cd "$(dirname "$appdir")"

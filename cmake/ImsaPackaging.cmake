@@ -39,6 +39,14 @@ endif()
 if(APPLE AND CMAKE_OSX_ARCHITECTURES)
     list(GET CMAKE_OSX_ARCHITECTURES 0 _imsa_arch)
 endif()
+# On Windows CMake takes the processor from PROCESSOR_ARCHITECTURE, which some
+# non-interactive MSYS2 shells don't pass through. Stop rather than name the
+# package "...-windows-.zip".
+if(_imsa_arch STREQUAL "")
+    message(FATAL_ERROR "CMAKE_SYSTEM_PROCESSOR is empty, so the package name "
+        "has no architecture. On Windows, export PROCESSOR_ARCHITECTURE (e.g. "
+        "AMD64) and configure a fresh build directory.")
+endif()
 
 # Distribution FFmpeg builds enable GPL components, which would make a bundled
 # package GPL. Packages must use the LGPL build from packaging/ffmpeg, passed

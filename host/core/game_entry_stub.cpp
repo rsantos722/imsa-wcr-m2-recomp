@@ -7,10 +7,9 @@ struct PPCContext;
 
 extern "C" {
 
-int m2_game_entry(int argc, char** argv) {
-    std::printf("[game] m2_game_entry STUB reached (argc=%d) — "
-                "reconfigure with -DIMSA_DISC=<iso> or -DIMSA_DATA_DIR=<dir> for the real recomp\n",
-                argc);
+int m2_game_entry(void) {
+    std::printf("[game] m2_game_entry STUB reached — "
+                "reconfigure with -DIMSA_DISC=<iso> or -DIMSA_DATA_DIR=<dir> for the real recomp\n");
     return 0;
 }
 

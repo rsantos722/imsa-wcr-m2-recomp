@@ -47,6 +47,7 @@
 
 #include "sha256.h"
 #include "utf8_path.h"
+#include "guest_boot_args.h"
 
 // Generated data image (game_data.c).
 extern unsigned g_recomp_text_base;
@@ -717,42 +718,34 @@ static int32_t m2_sync_main_call(PPCContext* c, void* user) {
 // `imsa_shell`) runs as a guest task, so the driving/game -> shooter2d handoff
 // is guest code — the launcher's own ChangeDirectory/OpenModule/CreateTaskVA
 // and its `switch (*(msg + 0x28))` on the child's exit status — rather than a
-// host shortcut. M2_BOOT_APP remains the documented direct-boot control and
-// keeps its previous behaviour byte for byte.
-// Boot args (sec-17 racePhase exit). The original OS hands the
-// driving game its host-supplied argc/argv or M2_GUEST_ARGS override; the
-// staged vector is consumed once, by the first guest task created with no
-// explicit ARGC/ARGP. Under the imsa_shell boot that task is the driving game
-// the launcher creates, so the shell boot must stage too — it does, from
-// m2_boot_disc_shell, before the launcher's CreateTaskVA runs.
+// host shortcut. M2_BOOT_APP remains the documented direct-boot control; both
+// boots stage the driving game's arguments the same way (below).
+// Boot args (sec-17 racePhase exit). LaunchMe.m2 starts the driving game with
+// an empty argv, so that is the default; M2_GUEST_ARGS stages developer flags.
+// The host's own command line is never forwarded: Parse_Args treats any
+// argument starting with '-', '/' or '\' as a flag keyed on its second
+// character, so a path such as /Users/... would set the 'U' flag (GDP+0x2190 =
+// -1, which skips P2_Init in CarSimThread). The staged vector is consumed
+// once, by the first guest task created with no explicit ARGC/ARGP. Under the
+// imsa_shell boot that task is the driving game the launcher creates, so the
+// shell boot must stage too — it does, from m2_boot_disc_shell, before the
+// launcher's CreateTaskVA runs.
 // The default boot (no M2_GUEST_ARGS) keeps GDP+0x5c at 0 so the sec-17 stall
 // is reachable; staging "-V" sets GDP+0x5c=1, which takes the racePhase exit
 // block and bypasses sec-17 entirely. M2_CARSIM_HOLD_TRACK_INIT defaults to
 // blocking on the authentic signal; =0 injects the teardown bit at 0x18ea4
 // and kills the sim after one tick.
-static void m2_stage_game_args(int for_driving_game, int argc, char** argv) {
-    if (!for_driving_game) {
-        m2_guest_set_main_args(0, NULL);
-        return;
-    }
-    const char* extra = getenv("M2_GUEST_ARGS");
-    if (extra && extra[0] != '\0') {
-        static char args_buf[1024];
-        static char* args_vec[32];
-        snprintf(args_buf, sizeof(args_buf), "%s", extra);
-        int n = 0;
-        args_vec[n++] = (char*)"imsa";
-        for (char* p = strtok(args_buf, " \t"); p && n < 32;
-             p = strtok(NULL, " \t")) {
-            args_vec[n++] = p;
-        }
-        m2_guest_set_main_args(n, args_vec);
-        return;
-    }
-    m2_guest_set_main_args(argc, argv);
+static void m2_stage_game_args(int for_driving_game) {
+    static char args_buf[1024];
+    static char* args_vec[32];
+    const int n = for_driving_game
+        ? m2_guest_boot_args(getenv("M2_GUEST_ARGS"), args_buf, sizeof(args_buf),
+                             args_vec, 32)
+        : 0;
+    m2_guest_set_main_args(n, n > 0 ? args_vec : NULL);
 }
 
-static int m2_boot_disc_shell(int argc, char** argv) {
+static int m2_boot_disc_shell(void) {
     // SHELL_NAME_EA is the pre-existing host-owned boot-name carve (the direct
     // boot path still stages its module path there). SHELL_TAGS_EA is the
     // launcher's CreateTask tag list, immediately after it and inside the same
@@ -767,7 +760,7 @@ static int m2_boot_disc_shell(int argc, char** argv) {
     // under this boot that is the game the launcher itself creates. The
     // launcher is created with an explicit empty argv further down, so it can
     // never take this vector.
-    m2_stage_game_args(1 /* driving/game */, argc, argv);
+    m2_stage_game_args(1 /* driving/game */);
     printf("[recomp] m2_game_entry: image=%s text %u bytes data %u bytes bss %u bytes\n",
            module_path, g_launchme_recomp_text_size, g_launchme_recomp_data_size,
            g_launchme_recomp_bss_size);
@@ -862,7 +855,7 @@ static int m2_boot_disc_shell(int argc, char** argv) {
     return 2;
 }
 
-int m2_game_entry(int argc, char** argv) {
+int m2_game_entry(void) {
     enum { BOOT_GAME = 0u, BOOT_SHOOTER2D = 1u, BOOT_NAME_EA = 0x003f3000u };
     const char* boot_app = getenv("M2_BOOT_APP");
     // M2_BOOT_APP is the documented dev-fidelity direct-boot control: with it
@@ -890,7 +883,7 @@ int m2_game_entry(int argc, char** argv) {
         direct_boot = 1;
     }
     if (!direct_boot)
-        return m2_boot_disc_shell(argc, argv);
+        return m2_boot_disc_shell();
     const char* module_path = module_slot == BOOT_SHOOTER2D
                                   ? "../shooter2d" : "game";
     const uint32_t text_base = module_slot == BOOT_SHOOTER2D
@@ -921,7 +914,7 @@ int m2_game_entry(int argc, char** argv) {
            text_base, data_base, bss_base, g_ctx->gpr[1]);
     guest_kernel_install();
 
-    m2_stage_game_args(module_slot == BOOT_GAME, argc, argv);
+    m2_stage_game_args(module_slot == BOOT_GAME);
 
     if (BOOT_NAME_EA > RECOMP_GUEST_MEM - 32u) return 2;
     memset(g_ctx->mem + BOOT_NAME_EA, 0, 32u);

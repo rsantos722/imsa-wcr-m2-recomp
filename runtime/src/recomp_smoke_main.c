@@ -20,7 +20,7 @@ extern unsigned g_recomp_bss_base;
 typedef void (*RecompFn)(PPCContext*);
 RecompFn recomp_lookup(unsigned guest);
 
-int m2_game_entry(int argc, char** argv);
+int m2_game_entry(void);
 // ---- typed kernel selector dispatch registry test ------------------------
 // Handlers hand out / accept 32-bit-clean guest addresses only (see
 // recomp_call_kernel_dispatch note); the sentinel lives inside guest RAM.
@@ -1192,7 +1192,7 @@ int main(void) {
         printf("[smoke] lookup %#x -> %p\n", test_addrs[i], (void*)fn);
     }
     // Call the recomp entry (it will alloc guest mem and call FN_M_SetupDynLit)
-    m2_game_entry(0, 0);
+    m2_game_entry();
     printf("[smoke] m2_game_entry returned\n");
     // Live handoff: m2_game_entry returns while the detached game-main task
     // still executes on its own host thread and owns the static kernel

@@ -36,6 +36,11 @@ add_executable(m2_guest_kernel_task_ex_test test_guest_kernel_task_ex.c)
 target_link_libraries(m2_guest_kernel_task_ex_test PRIVATE m2_runtime)
 add_test(NAME m2_guest_kernel_task_ex COMMAND m2_guest_kernel_task_ex_test)
 
+# Driving game argv: empty unless M2_GUEST_ARGS is set
+add_executable(m2_guest_boot_args_test test_guest_boot_args.c)
+target_include_directories(m2_guest_boot_args_test PRIVATE "${CMAKE_SOURCE_DIR}/runtime/include")
+add_test(NAME m2_guest_boot_args COMMAND m2_guest_boot_args_test)
+
 add_executable(m2_guest_kernel_wait_idle_test test_guest_kernel_wait_idle.c)
 target_link_libraries(m2_guest_kernel_wait_idle_test PRIVATE m2_runtime)
 add_test(NAME m2_guest_kernel_wait_idle COMMAND m2_guest_kernel_wait_idle_test)

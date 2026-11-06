@@ -90,7 +90,7 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 #endif
 
-extern "C" int m2_game_entry(int argc, char** argv);
+extern "C" int m2_game_entry(void);
 extern "C" void m2_recomp_shutdown(void);
 extern "C" int m2_guest_live_task_count(void);
 extern "C" void m2_guest_kernel_lock_diag_dump(void);
@@ -1518,12 +1518,12 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "[boot] checkpoint restore preparation failed rc=%d\n", boot_rc);
     } else {
         std::printf("[boot] calling m2_game_entry()\n");
-        boot_rc = m2_game_entry(argc, argv);
+        boot_rc = m2_game_entry();
         std::printf("[boot] m2_game_entry returned rc=%d\n", boot_rc);
     }
 #else
     std::printf("[boot] calling m2_game_entry()\n");
-    boot_rc = m2_game_entry(argc, argv);
+    boot_rc = m2_game_entry();
     std::printf("[boot] m2_game_entry returned rc=%d\n", boot_rc);
 #endif
 

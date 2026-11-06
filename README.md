@@ -2,7 +2,7 @@
 
 ![IMSA presents World Championship Racing](packaging/readme/IMSA_appbanner_M2_ABANR_640x240.png)
 
-This project is a static recompilation of the unreleased *IMSA presents World Championship Racing* and its on-disk companion game *shooter2d* for the unreleased Panasonic M2 console. This recomp has been designed to be as faithful to the original experience as possible while stopping short of being an emulator.
+This project is a static recompilation of the unreleased *IMSA presents World Championship Racing* and its on-disk companion game *shooter2d* for the unreleased Panasonic M2. This recomp has been designed to be as faithful to the original experience as possible while stopping short of being an emulator.
 
 <p align="center">
   <img src="packaging/readme/screenshot1.png" width="280" alt="IMSA screenshot 1" />
@@ -14,17 +14,12 @@ This project is a static recompilation of the unreleased *IMSA presents World Ch
 
 ## Quick Start
 
-See [the Releases page](https://github.com/rsantos722/imsa-wcr-m2-recomp/releases) to download the latest release for Windows, macOS, or Linux. On first run, the launcher asks for your own IMSA disc image (ISO) and copies the game files it needs from it.
-
-The packages are not signed by a registered developer:
-
-- **macOS:** if the app is blocked on first open, go to System Settings > Privacy & Security and choose **Open Anyway**.
-- **Windows:** if SmartScreen appears, choose **More info** > **Run anyway**.
+See [the Releases page](https://github.com/rsantos722/imsa-wcr-m2-recomp/releases) to download the latest release for Windows, macOS, or Linux. On first run, the launcher asks for your IMSA ISO and copies the files it needs from it.
 
 To build yourself, see [BUILDING.md](BUILDING.md).
 
 ```sh
-# Configure with your original OperaFS ISO image and build
+# Configure with your ISO build
 cmake -S . -B build -DIMSA_DISC=/path/to/imsa.iso
 cmake --build build --parallel 4
 
@@ -61,7 +56,7 @@ The goals of this project were:
 ## Features
 
 - **A recomp focused on accuracy:** While this is not an emulator, a huge amount of research and care has gone into preserving the original experience.
-- **Control Enhancements:** To the few who have been able to experience the game, the controls are infamous for not being great. In addition, the in-game control options do not function at all. The recomp allows you to either try the original control profile, a patched profile that makes the in-game settings work, or a Custom profile that binds directly to in-game options. In addition, an option for overhauled analog controls is available, which is a from-scratch rewrite using live physics calculations.
+- **Control Enhancements:** The controls are famously not very good in the original game. Additionally, the in-game control options do not function at all. The recomp allows you to either try the original control profile, a patched profile that makes the in-game settings work, or a Custom profile that binds directly to in-game options. In addition, an option for overhauled analog controls is available, which is a from-scratch rewrite using live physics calculations.
 - **Toggle-able Bug Fixes, Enhancements, and Restored Features:** All fixes or enhancements to the original game can be toggled on or off. Additionally, some unfinished features still present on-disc have been restored.
 - **Launcher:** The launcher includes setup, graphics and control configuration, toggles for bug fixes and enhancements, save data management, an option to launch into either IMSA Racing or shooter2d directly, and a 3D car model viewer.
 

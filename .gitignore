@@ -39,6 +39,7 @@ tweek.dat
 /cmake_install.cmake
 /CTestTestfile.cmake
 /Makefile
+/ffmpeg-lgpl/
 CMakeUserPresets.json
 compile_commands.json
 *.o

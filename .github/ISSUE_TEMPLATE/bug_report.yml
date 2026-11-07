@@ -11,8 +11,6 @@ body:
     attributes:
       label: What happened?
       description: What did you expect, and what happened instead?
-    validations:
-      required: true
   - type: textarea
     id: steps
     attributes:
@@ -20,8 +18,6 @@ body:
       placeholder: |
         1. Launch the game
         2. ...
-    validations:
-      required: true
   - type: dropdown
     id: game
     attributes:
@@ -44,8 +40,6 @@ body:
     attributes:
       label: Version or commit
       description: Release version, or the git commit if you built it yourself.
-    validations:
-      required: true
   - type: textarea
     id: config
     attributes:

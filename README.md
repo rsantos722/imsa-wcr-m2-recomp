@@ -63,7 +63,7 @@ In addition, this repo contains a large amount of documentation of the internal 
 
 ## Credits & Special Thanks
 
-- [Video Game Esoterica](https://www.youtube.com/channel/UCn2pQB4jsCTLUtx2NIkCvUg) for his extensive amount of footage of the game running on real hardware on YouTube.
+- [Video Game Esoterica](https://www.youtube.com/channel/UCn2pQB4jsCTLUtx2NIkCvUg) and [Tekknorg](https://www.youtube.com/@Tekknorg) for extensive footage of the game running on real hardware on YouTube.
 - [**MAME**](https://www.mamedev.org): the Konami M2 driver ([`konamim2.cpp`](https://github.com/mamedev/mame/blob/master/src/mame/konami/konamim2.cpp), [`3dom2_te.cpp`](https://github.com/mamedev/mame/blob/master/src/mame/konami/3dom2_te.cpp)) was used as a reference for the Triangle Engine and the vertex-retention logic (`host/graphics/te_vertex_state.h`).
 - [3dodev.com](https://3dodev.com)'s archive of the 3DO M2 Mercury Programmer's Guide and 3DO M2 Command List Toolkit.
 - [trapexit](https://github.com/trapexit)'s archive of Portfolio OS reference materials ([`portfolio_os_m2`](https://github.com/trapexit/portfolio_os_m2)) and 3DO SDK ([`3DO-information`](https://github.com/trapexit/3DO-information)).

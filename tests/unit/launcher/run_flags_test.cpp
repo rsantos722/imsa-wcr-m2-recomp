@@ -580,14 +580,16 @@ int main() {
     SDL_Environment* env = SDL_CreateEnvironment(false);
     if (!env) return fail("cannot create child environment");
     SDL_SetEnvironmentVariable(env, "M2_BOOT_APP", "shooter2d", true);
+    // Racing must leave M2_BOOT_APP unset: any value boots driving/game
+    // directly and skips LaunchMe.m2's handoff to shooter2d.
     if (!apply_boot_option(false, env) ||
-        std::string(SDL_GetEnvironmentVariable(env, "M2_BOOT_APP")) != "game")
-        return fail("Launch game did not select driving");
+        SDL_GetEnvironmentVariable(env, "M2_BOOT_APP") != nullptr)
+        return fail("Launch game did not clear the boot choice for the disc shell");
     if (!apply_boot_option(true, env) ||
         std::string(SDL_GetEnvironmentVariable(env, "M2_BOOT_APP")) != "shooter2d")
         return fail("Launch shooter2d did not select shooter");
     if (!apply_boot_option(false, env) ||
-        std::string(SDL_GetEnvironmentVariable(env, "M2_BOOT_APP")) != "game")
+        SDL_GetEnvironmentVariable(env, "M2_BOOT_APP") != nullptr)
         return fail("shooter launch leaked into the next game launch");
     SDL_SetEnvironmentVariable(env, "M2_MICROCARD_ROOT", "/stale/card", true);
     if (!apply_save_option("/managed saves/card", env) ||

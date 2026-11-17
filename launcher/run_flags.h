@@ -89,9 +89,12 @@ inline bool apply_save_option(const std::filesystem::path& root, SDL_Environment
                                                        m2host::platform::path_to_utf8(root).c_str(), true);
 }
 
+// Racing leaves M2_BOOT_APP unset so the disc's LaunchMe.m2 shell runs and can
+// hand off to shooter2d when driving/game exits with status 1. Any value,
+// including "game", boots driving/game directly and skips that handoff.
 inline bool apply_boot_option(bool shooter2d, SDL_Environment* environment) {
-    return SDL_SetEnvironmentVariable(environment, "M2_BOOT_APP",
-                                      shooter2d ? "shooter2d" : "game", true);
+    return shooter2d ? SDL_SetEnvironmentVariable(environment, "M2_BOOT_APP", "shooter2d", true)
+                     : SDL_UnsetEnvironmentVariable(environment, "M2_BOOT_APP");
 }
 
 inline bool save_settings(const std::filesystem::path& path, const Settings& s, std::string& message) {

@@ -8,3 +8,8 @@ Terminal=false
 Categories=Game;
 StartupNotify=true
 StartupWMClass=m2launcher
+Actions=Play;
+
+[Desktop Action Play]
+Name=Play
+Exec=m2launcher --play

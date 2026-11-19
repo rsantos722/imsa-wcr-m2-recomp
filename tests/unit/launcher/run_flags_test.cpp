@@ -772,6 +772,48 @@ int main() {
         ensure_launcher_flags(steering);
         if (flag_is_on(steering, flag)) return fail("saved steering opt-out was overridden");
     }
+    // The window and `m2launcher --play` prepare launches the same way: saved
+    // choices kept, this install's paths and the session-only options forced.
+    {
+        Settings saved;
+        copy(saved.executable, "/old/m2host"); copy(saved.data, "/old/driving/data");
+        saved.width = 800; saved.height = 600; saved.fullscreen = true;
+        saved.fast_forward = true; saved.use_host_defaults = true;
+        saved.controls_mode = M2_CONTROLS_ORIGINAL;
+        if (!save_settings(path, saved, message)) return fail("direct-play settings did not save");
+        Settings prepared;
+        if (!prepare_launch_settings(path, "/install/m2host", "/install/game/driving/data", prepared, message))
+            return fail("saved settings were rejected for a launch");
+        if (std::string(prepared.executable.data()) != "/install/m2host" ||
+            std::string(prepared.data.data()) != "/install/game/driving/data")
+            return fail("launch did not follow this install's host and data");
+        if (prepared.width != 800 || prepared.height != 600 || !prepared.fullscreen ||
+            prepared.controls_mode != M2_CONTROLS_ORIGINAL)
+            return fail("launch dropped the saved display or controls choices");
+        if (prepared.fast_forward || prepared.use_host_defaults)
+            return fail("a session-only option persisted into a launch");
+        if (!flag_is_on(prepared, "M2_IMPROVED_ANALOG_STEERING"))
+            return fail("launch settings missed the curated default rows");
+        // The racing launch boots the disc shell from driving/data, not shooter2d.
+        const auto args = launch_arguments(prepared, "/profiles/controls.cfg", false);
+        if (args[2] != m2host::platform::path_to_utf8(launch_data_root(prepared, false)) ||
+            args[2].find("shooter2d") != std::string::npos)
+            return fail("direct play did not launch the racing data root");
+
+        fs::remove(path);
+        Settings fresh_install;
+        if (!prepare_launch_settings(path, "/install/m2host", "/install/data", fresh_install, message) ||
+            std::string(fresh_install.executable.data()) != "/install/m2host" ||
+            fresh_install.width != Settings{}.width)
+            return fail("a missing settings file did not give defaults");
+
+        std::ofstream(path) << "not launcher settings\n";
+        Settings broken;
+        if (prepare_launch_settings(path, "/install/m2host", "/install/data", broken, message))
+            return fail("unreadable settings were accepted for a launch");
+        if (std::string(broken.executable.data()) != "/install/m2host")
+            return fail("unreadable settings skipped the install paths");
+    }
     fs::remove(path);
     return 0;
 }

@@ -60,9 +60,10 @@ The goals of this project were:
 
 In addition, this repo contains a large amount of documentation of the internal game and 3DO M2 based on the research completed. View the documentation map at [docs/README.md](docs/README.md).
 
-## Project Status & Future Plans
+## Status, Future Plans, and FAQ
 
-- There are a few graphical and performance issues I am ironing out, but the game is fully playable and stable at the moment. If you experience any issues, please report them on the [Issues page](https://github.com/rsantos722/imsa-wcr-m2-recomp/issues/).
+- From my understanding, all graphical defects still left in the game are original defects and not caused by the recomp. I may still update the application in the future to allow some of these issues to be patched out.
+- To start the game directly instead of the launcher, start the launcher with the --play flag
 - I have a few ideas for additional features, including proper widescreen support, finding a use for the unused explosion effect, and ports to other platforms. If you have any ideas, please freel free to add it to the [Discussions page](https://github.com/rsantos722/imsa-wcr-m2-recomp/discussions)
 
 

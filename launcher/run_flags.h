@@ -638,6 +638,25 @@ inline void ensure_launcher_flags(Settings& s) {
         s.flags.push_back(flag);
     }
 }
+
+// The settings a launch uses: the saved file at `path` (defaults when there is
+// none) with this install's host and data paths, the options that never
+// persist cleared, and the curated rows merged in. The launcher window and
+// `m2launcher --play` both start from this, so they run the same game. The
+// overrides apply even when the file cannot be read; the result is false then.
+inline bool prepare_launch_settings(const std::filesystem::path& path,
+                                    const std::string& executable,
+                                    const std::string& data,
+                                    Settings& s, std::string& message) {
+    std::error_code ec;
+    const bool valid = !std::filesystem::exists(path, ec) || load_settings(path, s, message);
+    s.use_host_defaults = false;
+    s.fast_forward = false;
+    copy(s.executable, executable);
+    copy(s.data, data);
+    ensure_launcher_flags(s);
+    return valid;
+}
 // Curated opt-in boolean option. The flag's own contract treats the exact
 // value "1" as on and every other value as off, so a saved 0 or hand-typed
 // value reads as unchecked. Turning the option off clears the value, leaving

@@ -134,6 +134,45 @@ fs::path executable_path(const char* base) {
                                                host_has_guest);
 }
 
+// The host and racing data of this install, whatever the settings file says.
+std::string install_executable() { return path_to_utf8(executable_path(SDL_GetBasePath())); }
+std::string install_data(const fs::path& game_root) { return path_to_utf8(game_root / "driving/data"); }
+
+// `m2launcher --play`: start the game with the saved settings and controls,
+// wait for it, and return its exit code, without opening the launcher window.
+// For shortcuts (Steam's Game Mode, desktop actions) that cannot drive the
+// window. It launches exactly what the window's Play button does: the racing
+// launch leaves M2_BOOT_APP unset, so the disc's LaunchMe.m2 shell boots and
+// can still hand off to shooter2d in game. Returns nothing, with `message`
+// explaining why, when the game cannot start yet; the caller opens the window
+// so setup can be finished there.
+std::optional<int> direct_play(const fs::path& settings_dir, std::string& message) {
+    const fs::path game_root = launcher_disc::install_root(settings_dir);
+    Settings settings;
+    if (!prepare_launch_settings(settings_dir / "launcher.cfg", install_executable(),
+                                 install_data(game_root), settings, message))
+        return std::nullopt;
+    if (!launcher_disc::installed(game_root)) {
+        message = "Select an IMSA Racing ISO image to install.";
+        return std::nullopt;
+    }
+    // The window saves the controls profile before every launch, so the host
+    // always reads one; do the same with the saved or default bindings.
+    const fs::path profile = settings_dir / "controls.cfg";
+    HostControls controls;
+    controls.defaults();
+    if ((fs::exists(profile) && !controls.load(profile, message)) ||
+        !controls.save(profile, message))
+        return std::nullopt;
+    const fs::path saves = launcher_saves::save_root(path_from_utf8(settings.executable.data()));
+    SDL_Process* process = launch(settings, profile, message, /*shooter2d=*/false, saves);
+    if (!process) return std::nullopt;
+    int exit_code = 1;
+    if (!SDL_WaitProcess(process, true, &exit_code)) exit_code = 1;
+    SDL_DestroyProcess(process);
+    return exit_code;
+}
+
 // Screenshot destination shown in the Controls tooltip. M2_SCREENSHOT_ROOT
 // wins; otherwise follow the selected host executable, as save management
 // does, because the launcher and host can live in sibling build directories.
@@ -550,6 +589,12 @@ public:
         timer_.Start(16);
     }
 
+    // Shows a status message that arrived before the window existed.
+    void notify(const std::string& message) {
+        message_ = message;
+        show_message();
+    }
+
     // Native keyboard and mouse events, seen application-wide before any
     // control handles them. Returns true when the event was consumed.
     bool filter_input(wxEvent& event) {
@@ -662,18 +707,15 @@ private:
 
     // The host and data paths always follow this install, whatever was saved.
     void apply_install_paths() {
-        copy(settings_.executable, path_to_utf8(executable_path(SDL_GetBasePath())));
-        copy(settings_.data, path_to_utf8(game_root_ / "driving/data"));
+        copy(settings_.executable, install_executable());
+        copy(settings_.data, install_data(game_root_));
     }
 
     void load_state() {
-        settings_valid_ = !fs::exists(settings_path_) || load_settings(settings_path_, settings_, message_);
-        settings_.use_host_defaults = false;
-        settings_.fast_forward = false;
-        apply_install_paths();
+        settings_valid_ = prepare_launch_settings(settings_path_, install_executable(),
+                                                  install_data(game_root_), settings_, message_);
         game_ready_ = launcher_disc::installed(game_root_);
         if (!game_ready_ && settings_valid_) message_ = "Select an IMSA Racing ISO image to install.";
-        ensure_launcher_flags(settings_);
         controls_.defaults();
         controls_.open_devices();
         controls_valid_ = !fs::exists(profile_) || controls_.load(profile_, message_);
@@ -1947,10 +1989,12 @@ class LauncherApp final : public wxApp {
 public:
     fs::path settings_dir;
     std::string initial_tab = "game";
+    std::string notice;
 
     bool OnInit() override {
         SetAppDisplayName("IMSA WCR M2 Recomp Launcher");
         g_frame = new LauncherFrame(settings_dir, initial_tab);
+        if (!notice.empty()) g_frame->notify(notice);
         apply_launcher_icon(*g_frame);
         g_frame->Show();
         return true;
@@ -1972,6 +2016,7 @@ int main(int argc, char** argv) {
     int preview_part = -1;
     float preview_yaw = kDefaultYaw, preview_pitch = kDefaultPitch;
     bool select_asset_tab = false;
+    bool play = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--settings-dir" && i + 1 < argc) settings_dir = argv[++i];
@@ -1981,6 +2026,7 @@ int main(int argc, char** argv) {
             g_asset_viewer.chassis_choice = 0;
         }
         else if (arg == "--tab" && i + 1 < argc) initial_tab = argv[++i];
+        else if (arg == "--play") play = true;
         else if (arg == "--preview-asset" && i + 1 < argc) preview_input = argv[++i];
         else if (arg == "--preview-output" && i + 1 < argc) preview_output = argv[++i];
         else if (arg == "--preview-part" && i + 1 < argc) preview_part = std::atoi(argv[++i]);
@@ -1988,7 +2034,7 @@ int main(int argc, char** argv) {
         else if (arg == "--preview-pitch" && i + 1 < argc) preview_pitch = std::strtof(argv[++i], nullptr);
         else if (arg == "--preview-tire" && i + 1 < argc) preview_tire = argv[++i];
         else {
-            SDL_Log("Usage: m2launcher [--settings-dir DIRECTORY] [--car-viewer] [--tab game|graphics|controls|enhancements|saves|viewer]\n"
+            SDL_Log("Usage: m2launcher [--settings-dir DIRECTORY] [--play] [--car-viewer] [--tab game|graphics|controls|enhancements|saves|viewer]\n"
                     "       m2launcher --preview-asset MEMIMAGE --preview-output FILE.bmp [--preview-part N] [--preview-yaw RADIANS] [--preview-pitch RADIANS] [--preview-tire MEMIMAGE]");
             return arg == "--help" ? 0 : 2;
         }
@@ -2034,6 +2080,14 @@ int main(int argc, char** argv) {
         return 1;
     }
     settings_dir = fs::absolute(settings_dir);
+    std::string notice;
+    if (play) {
+        if (const auto exit_code = direct_play(settings_dir, notice)) {
+            SDL_Quit();
+            return *exit_code;
+        }
+        SDL_Log("Cannot start the game: %s", notice.c_str());
+    }
     const bool game_available = launcher_disc::installed(launcher_disc::install_root(settings_dir));
     if (initial_tab.empty()) initial_tab = select_asset_tab && game_available ? "viewer" : "game";
 
@@ -2041,6 +2095,7 @@ int main(int argc, char** argv) {
     auto* app = static_cast<LauncherApp*>(wxApp::GetInstance());
     app->settings_dir = settings_dir;
     app->initial_tab = initial_tab;
+    app->notice = notice;
     // wxWidgets parses argv itself; the launcher's own options are consumed above.
     int wx_argc = 1;
     const int result = wxEntry(wx_argc, argv);

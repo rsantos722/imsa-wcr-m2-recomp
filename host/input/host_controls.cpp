@@ -32,7 +32,7 @@ void HostControls::custom_defaults() {
     const std::pair<Action, SDL_Scancode> keys[] = {
         {Action::DriveLeft, SDL_SCANCODE_LEFT}, {Action::DriveRight, SDL_SCANCODE_RIGHT},
         {Action::DriveThrottle, SDL_SCANCODE_X}, {Action::DriveBrake, SDL_SCANCODE_Z},
-        {Action::DriveShiftUp, SDL_SCANCODE_LSHIFT}, {Action::DriveShiftDown, SDL_SCANCODE_RSHIFT},
+        {Action::DriveShiftUp, SDL_SCANCODE_S}, {Action::DriveShiftDown, SDL_SCANCODE_A},
         {Action::DriveAids, SDL_SCANCODE_V},
         {Action::DriveView, SDL_SCANCODE_C}, {Action::DrivePause, SDL_SCANCODE_P},
         {Action::DigitalUp, SDL_SCANCODE_UP}, {Action::DigitalDown, SDL_SCANCODE_DOWN},
@@ -58,10 +58,10 @@ void HostControls::defaults() {
         {Action::B, SDL_SCANCODE_Z},
         {Action::C, SDL_SCANCODE_V},
         {Action::X, SDL_SCANCODE_C},
-        {Action::L, SDL_SCANCODE_LSHIFT},
-        {Action::R, SDL_SCANCODE_RSHIFT},
-        {Action::P, SDL_SCANCODE_ESCAPE},
-        {Action::Quit, SDL_SCANCODE_Q},
+        {Action::L, SDL_SCANCODE_A},
+        {Action::R, SDL_SCANCODE_S},
+        {Action::P, SDL_SCANCODE_P},
+        {Action::Quit, SDL_SCANCODE_ESCAPE},
         // Vendor extended pad buttons.
         {Action::D, SDL_SCANCODE_B},
         {Action::E, SDL_SCANCODE_N},

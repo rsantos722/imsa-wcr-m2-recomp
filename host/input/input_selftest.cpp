@@ -136,9 +136,19 @@ void test_host_profiles() {
             SDL_PushEvent(&tap_event); default_adapter.poll_sdl(default_map, defaults);
             return buttons;
         };
+        check(tap(SDL_SCANCODE_A) == kBtnL, "launcher default A reaches the L (shift down) button");
+        check(tap(SDL_SCANCODE_S) == kBtnR, "launcher default S reaches the R (shift up) button");
+        check(tap(SDL_SCANCODE_P) == kBtnStart, "launcher default P reaches the Pause button");
         check(tap(SDL_SCANCODE_B) == kBtnD, "launcher default B reaches the extended D button");
         check(tap(SDL_SCANCODE_N) == kBtnE, "launcher default N reaches the extended E button");
         check(tap(SDL_SCANCODE_M) == kBtnF, "launcher default M reaches the extended F button");
+        default_map.set_custom_controls(true);
+        check(tap(SDL_SCANCODE_A) == kBtnL, "launcher custom default A reaches shift down");
+        check(tap(SDL_SCANCODE_S) == kBtnR, "launcher custom default S reaches shift up");
+        check(tap(SDL_SCANCODE_P) == kBtnStart, "launcher custom default P reaches Pause");
+        check(!default_map.quit_requested(), "quit is not requested before Escape");
+        check(tap(SDL_SCANCODE_ESCAPE) == 0 && default_map.quit_requested(),
+              "launcher default Escape requests quit");
     }
     {
         // The launcher's Bind action replaces the selected action's previous

@@ -1,10 +1,11 @@
 # Tools
 
-Python utilities for inspecting and extracting the user's game data, plus the host diagnostic control client.
+Utilities for inspecting and extracting the user's game data, plus the host diagnostic control client.
 
 | Tool | Purpose |
 | --- | --- |
 | `m2ctl.py` | Control a suspended `m2host` diagnostic session over its local socket |
+| `seed_game_data_release.sh` | Upload the supported disc image to the private data repository used by CI releases (see [Releasing](../docs/releasing.md)) |
 | `operafs.py` | List or extract an OperaFS ISO |
 | `m2_lzss.py` | Decompress M2/3DO loader LZSS sections |
 | `decode_cbd2.py` | Decode CBD2 AIFF-C audio |

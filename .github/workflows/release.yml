@@ -1,7 +1,8 @@
 name: Package Check
 
-# Manual workflow to verify CPack packaging across Linux, macOS, and Windows.
-# Real release packages are built locally by maintainers with the game disc.
+# Manual workflow to verify CPack packaging across Linux, macOS, and Windows
+# without game data. Playable release packages are built by the Release
+# workflow (release-build.yml), or locally with the game disc.
 # This workflow verifies the packaging targets and artifacts without publishing.
 on:
   workflow_dispatch:

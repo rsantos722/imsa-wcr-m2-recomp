@@ -1,0 +1,496 @@
+name: Release
+
+# Builds playable packages from the supported disc image and attaches them to
+# a draft GitHub release. The image itself is never committed: it is downloaded
+# from a private game-data repository at build time. See docs/releasing.md for
+# the one-time storage, token, and environment setup.
+#
+# Maintainers can also build the same packages locally; see BUILDING.md.
+# This workflow automates that process on GitHub-hosted runners.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (for example v1.0.2)
+        required: true
+        type: string
+      draft:
+        description: Create the GitHub release as a draft
+        required: true
+        default: true
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# A tag build and a manual build of the same tag must not upload assets to the
+# same release at once. Never cancel a release run midway through packaging.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  # Override these repository variables if the data repository or asset uses
+  # different names. The token is the environment secret GAME_DATA_TOKEN.
+  GAME_DATA_REPO: ${{ vars.GAME_DATA_REPO || format('{0}/imsa-wcr-m2-recomp-data', github.repository_owner) }}
+  GAME_DATA_RELEASE: ${{ vars.GAME_DATA_RELEASE || 'game-data' }}
+  GAME_DATA_ASSET: ${{ vars.GAME_DATA_ASSET || 'imsa.iso' }}
+
+jobs:
+  package:
+    name: Package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 keeps the AppImage runnable on glibc 2.35 and newer.
+          # It only packages wxWidgets 3.0, so the launcher links a static 3.2
+          # built from source on the runner instead.
+          - name: Linux x86_64
+            artifact: linux-x86_64
+            os: ubuntu-22.04
+            generator: Unix Makefiles
+            cmake_args: -DIMSA_LAUNCHER_FETCH_WXWIDGETS=ON
+          - name: macOS arm64
+            artifact: macos-arm64
+            os: macos-latest
+            generator: Unix Makefiles
+            cmake_args: ""
+          - name: macOS x86_64
+            artifact: macos-x86_64
+            os: macos-15-intel
+            generator: Unix Makefiles
+            cmake_args: ""
+          - name: Windows x86_64
+            artifact: windows-x86_64
+            os: windows-latest
+            msys2: true
+            generator: Ninja
+            cmake_args: ""
+    defaults:
+      run:
+        shell: ${{ matrix.msys2 && 'msys2 {0}' || 'bash' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+
+      - name: Verify release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_TAG:-}" ]; then
+            echo "::error::No release tag: dispatch the workflow with a tag or push a v* tag."
+            exit 1
+          fi
+          if ! git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "::error::${RELEASE_TAG} is not a tag. Pass an existing release tag, not a branch."
+            exit 1
+          fi
+          version="$(tr -d '[:space:]' < VERSION)"
+          tag="${RELEASE_TAG#v}"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag ${RELEASE_TAG} does not match VERSION (${version}). Bump VERSION before tagging."
+            exit 1
+          fi
+
+      - name: Check release is not already published
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+            if [ "$is_draft" != "true" ]; then
+              echo "::error::Release ${RELEASE_TAG} is already published; use a new tag."
+              exit 1
+            fi
+          fi
+
+      - name: Fetch game disc image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
+          GAME_DATA_URL: ${{ secrets.GAME_DATA_URL }}
+          GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # MSYS2/Git Bash needs a drive-letter path for the native gh and
+          # curl binaries; CMake receives the same path and converts it.
+          if command -v cygpath >/dev/null 2>&1; then
+            temp_dir="$(cygpath -m "$RUNNER_TEMP")"
+          else
+            temp_dir="$RUNNER_TEMP"
+          fi
+          iso="$temp_dir/$GAME_DATA_ASSET"
+
+          if [ -n "${GAME_DATA_URL:-}" ]; then
+            curl_args=(-fL --retry 3 --silent --show-error)
+            if [ -n "${GAME_DATA_TOKEN:-}" ]; then
+              curl_args+=(-H "Authorization: Bearer ${GAME_DATA_TOKEN}")
+            fi
+            if ! curl "${curl_args[@]}" -o "$iso" "$GAME_DATA_URL"; then
+              echo "::error::Could not download the disc image from GAME_DATA_URL."
+              exit 1
+            fi
+          elif [ -n "${GAME_DATA_REPO:-}" ] && [ -n "${GH_TOKEN:-}" ]; then
+            visibility="$(gh repo view "$GAME_DATA_REPO" --json visibility --jq .visibility 2>/dev/null || true)"
+            if [ "$visibility" != "PRIVATE" ]; then
+              echo "::error::${GAME_DATA_REPO} is not a private repository (visibility: ${visibility:-unknown})."
+              echo "::error::The disc image must stay in a private repository."
+              exit 1
+            fi
+            if ! gh release download "$GAME_DATA_RELEASE" \
+                --repo "$GAME_DATA_REPO" \
+                --pattern "$GAME_DATA_ASSET" \
+                --dir "$temp_dir" \
+                --clobber; then
+              echo "::error::Could not download ${GAME_DATA_ASSET} from ${GAME_DATA_REPO} release ${GAME_DATA_RELEASE}."
+              echo "::error::Check GAME_DATA_REPO, GAME_DATA_RELEASE, GAME_DATA_ASSET, and GAME_DATA_TOKEN."
+              exit 1
+            fi
+          else
+            echo "::error::No game disc source is configured."
+            echo "::error::Set the release environment secret GAME_DATA_TOKEN (private GitHub release) or GAME_DATA_URL."
+            exit 1
+          fi
+
+          [ -f "$iso" ] || { echo "::error::Disc image was not downloaded to ${iso}."; exit 1; }
+
+          # cmake/ImsaGameData.cmake is the source of truth for the supported
+          # disc. Check here as well so a bad download fails before a long build.
+          expected_size="$(sed -n 's/^set(IMSA_ISO_SIZE \([0-9][0-9]*\))$/\1/p' cmake/ImsaGameData.cmake)"
+          expected_sha="$(sed -n 's/^set(IMSA_ISO_SHA256 "\([0-9a-f][0-9a-f]*\)")$/\1/p' cmake/ImsaGameData.cmake)"
+          if [ -z "$expected_size" ] || [ -z "$expected_sha" ]; then
+            echo "::error::Could not read the supported disc size and hash from cmake/ImsaGameData.cmake."
+            exit 1
+          fi
+
+          actual_size="$(wc -c < "$iso" | tr -d '[:space:]')"
+          actual_sha="$(cmake -E sha256sum "$iso" | awk '{print $1}')"
+          if [ "$actual_size" != "$expected_size" ]; then
+            echo "::error::Disc image is ${actual_size} bytes; expected ${expected_size}."
+            exit 1
+          fi
+          if [ "$actual_sha" != "$expected_sha" ]; then
+            echo "::error::Disc image SHA-256 is ${actual_sha}; expected ${expected_sha}."
+            exit 1
+          fi
+
+          echo "ISO_PATH=$iso" >> "$GITHUB_ENV"
+          echo "Using disc image ${iso} (${actual_size} bytes, ${actual_sha})"
+
+      - name: Set up MSYS2 (UCRT64)
+        if: matrix.msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pytest
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-python-numpy
+            mingw-w64-ucrt-x86_64-python-capstone
+            mingw-w64-ucrt-x86_64-sdl3
+            mingw-w64-ucrt-x86_64-wxwidgets3.2
+            mingw-w64-ucrt-x86_64-nasm
+            make
+            diffutils
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sdl3 pytest wxwidgets nasm pillow numpy
+          python3 -m pip install --break-system-packages -r recompiler/requirements.txt
+      - name: Install Python (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libgl-dev libpng-dev libjpeg-dev nasm file
+          python -m pip install -r tools/requirements.txt -r tests/tools/requirements.txt -r recompiler/requirements.txt
+      - name: Install SDL3 (Linux)
+        if: runner.os == 'Linux'
+        uses: libsdl-org/setup-sdl@v1
+        with:
+          version: "3-latest"
+          install-linux-dependencies: true
+
+      # Distribution FFmpeg builds enable GPL components. Bundle this LGPL
+      # build of the pinned upstream release instead; see packaging/ffmpeg.
+      - name: Cache FFmpeg (LGPL)
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-lgpl
+          key: ffmpeg-lgpl-${{ matrix.os }}-${{ hashFiles('packaging/ffmpeg/build-ffmpeg.sh') }}
+      - name: Build FFmpeg (LGPL)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: packaging/ffmpeg/build-ffmpeg.sh "$PWD/ffmpeg-lgpl"
+      - name: Locate FFmpeg
+        run: echo "IMSA_FFMPEG_ROOT=$(cd ffmpeg-lgpl && (cygpath -m "$PWD" 2>/dev/null || pwd))" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          disc="$ISO_PATH"
+          if command -v cygpath >/dev/null 2>&1; then
+            disc="$(cygpath -m "$disc")"
+          fi
+          extra_args=""
+          # Pin MSYS2's Python: CMake otherwise may pick a Windows Python
+          # without capstone, and the recompiler cannot run.
+          if [ -n "${MSYSTEM:-}" ] && command -v cygpath >/dev/null 2>&1; then
+            extra_args="-DPython3_EXECUTABLE=$(cygpath -m /ucrt64/bin/python.exe)"
+          fi
+          cmake -S . -B build -G "${{ matrix.generator }}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DIMSA_DISC="$disc" \
+            -DIMSA_FFMPEG_ROOT="$IMSA_FFMPEG_ROOT" \
+            ${{ matrix.cmake_args }} \
+            $extra_args
+      - name: Check the guest was generated
+        run: |
+          set -euo pipefail
+          # A stub build would make a package that cannot run the game. Fail
+          # here rather than publish it.
+          test -f build/generated/game_data.c
+          test -f build/generated/shooter2d_data.c
+          test -f build/generated/launchme_data.c
+          test -f build/game-data/driving/game
+      # ImsaPackaging.cmake skips packaging, without failing, when the
+      # launcher target is missing (no wxWidgets found).
+      - name: Check packaging is enabled
+        run: |
+          if [ ! -f build/CPackConfig.cmake ]; then
+            echo "::error::Packaging is disabled: configure found no m2launcher (wxWidgets missing?)"
+            exit 1
+          fi
+      - name: Build
+        run: cmake --build build --parallel 4
+      - name: Tests
+        # Windows finds the FFmpeg DLLs through PATH; elsewhere this is harmless.
+        run: |
+          export PATH="$PWD/ffmpeg-lgpl/bin:$PATH"
+          ctest --test-dir build --output-on-failure -C Release --parallel 4
+
+      - name: Package
+        run: cpack --config build/CPackConfig.cmake -C Release -B dist
+
+      - name: Check package layout (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          set -e
+          # Paths inside the ZIP, without its top folder.
+          (cd dist && cmake -E tar tf ./*.zip) | sed 's|^[^/]*/||' > layout.txt
+          cat layout.txt
+          top=$(grep -v '/' layout.txt | grep -v '^$' | sort | tr '\n' '|')
+          if [ "$top" != "IMSA WCR M2 Recomp.exe|README.txt|" ]; then
+            echo "::error::Unexpected files at the top of the package: $top"
+            exit 1
+          fi
+          grep -qx 'bin/m2launcher.exe' layout.txt
+          grep -qx 'bin/m2host.exe' layout.txt
+          grep -qx 'bin/portable.txt' layout.txt
+          grep -qx 'userdata/README.txt' layout.txt
+          if grep -i '\.dll$' layout.txt | grep -qv '^bin/'; then
+            echo "::error::Found DLLs outside bin"
+            exit 1
+          fi
+      - name: Check package layout (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          # Paths inside the tar.gz, without its top folder.
+          tar tzf dist/*.tar.gz | sed 's|^[^/]*/||' > layout.txt
+          cat layout.txt
+          top=$(grep -v '/' layout.txt | grep -v '^$' | LC_ALL=C sort | tr '\n' '|')
+          if [ "$top" != "README.txt|imsa-wcr-m2-recomp|" ]; then
+            echo "::error::Unexpected files at the top of the package: $top"
+            exit 1
+          fi
+          grep -qx 'bin/m2launcher' layout.txt
+          grep -qx 'bin/m2host' layout.txt
+          grep -qx 'bin/portable.txt' layout.txt
+          grep -qx 'userdata/README.txt' layout.txt
+          grep -qx 'licenses/LICENSE' layout.txt
+          if grep -q '^share/doc/' layout.txt; then
+            echo "::error::The tar.gz contains the system install's share/doc"
+            exit 1
+          fi
+          # A plain install, which the AppImage is built from, must stay free
+          # of the portable files.
+          cmake --install build --prefix "$PWD/plain-install"
+          for f in bin/portable.txt userdata README.txt imsa-wcr-m2-recomp licenses; do
+            if [ -e "plain-install/$f" ]; then
+              echo "::error::A plain install contains the portable file $f"
+              exit 1
+            fi
+          done
+          test -f plain-install/share/doc/imsa-wcr-m2-recomp/LICENSE
+
+      - name: Check packages contain no game data
+        run: |
+          python3 - <<'PY'
+          import glob
+          import sys
+          import tarfile
+          import zipfile
+
+          banned_parts = {"game-data", "driving", "shooter2d"}
+          banned_names = {"launchme.m2"}
+          found = []
+
+          for path in sorted(glob.glob("dist/*.zip") + glob.glob("dist/*.tar.gz")):
+              if path.endswith(".zip"):
+                  with zipfile.ZipFile(path) as archive:
+                      names = archive.namelist()
+              else:
+                  with tarfile.open(path, "r:gz") as archive:
+                      names = archive.getnames()
+              for name in names:
+                  parts = [p for p in name.replace("\\", "/").split("/") if p not in ("", ".")]
+                  if (
+                      any(part in banned_parts for part in parts)
+                      or (parts and parts[-1].lower() in banned_names)
+                      or name.lower().endswith(".iso")
+                  ):
+                      found.append(f"{path}: {name}")
+
+          if found:
+              print("\n".join(found))
+              sys.exit("game data found in a package")
+          print("No game data in packaged archives")
+          PY
+
+      - name: Check DMG contains no game data
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          dmg="$(ls dist/*.dmg)"
+          mount="$(mktemp -d)"
+          trap 'hdiutil detach "$mount" -quiet' EXIT
+          hdiutil attach "$dmg" -mountpoint "$mount" -nobrowse -readonly -quiet
+          if find "$mount" \( \
+              -type d \( -name 'game-data' -o -name 'driving' -o -name 'shooter2d' \) \
+              -o -type f \( -iname '*.iso' -o -iname 'LaunchMe.m2' \
+                  -o -path '*/driving/game' -o -path '*/shooter2d/shooter2d' \) \
+              \) -print -quit | grep -q .; then
+            echo "::error::Game data found in $dmg"
+            exit 1
+          fi
+          echo "No game data in $dmg"
+
+      - name: Install linuxdeploy (Linux)
+        if: runner.os == 'Linux'
+        env:
+          LINUXDEPLOY_TAG: 1-alpha-20251107-1
+          GTK_PLUGIN_COMMIT: 7a3fbc31a9e5075073ff8790f26effbac5f84453
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSL -o "$HOME/bin/linuxdeploy" \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-x86_64.AppImage"
+          curl -fsSL -o "$HOME/bin/linuxdeploy-plugin-gtk" \
+            "https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/$GTK_PLUGIN_COMMIT/linuxdeploy-plugin-gtk.sh"
+          chmod +x "$HOME/bin/linuxdeploy" "$HOME/bin/linuxdeploy-plugin-gtk"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Build AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: packaging/appimage/build-appimage.sh build dist
+
+      - name: Checksums
+        run: |
+          cd dist
+          for f in *.zip *.dmg *.tar.gz *.AppImage; do
+            [ -e "$f" ] || continue
+            sha256sum "$f" > "$f.sha256" 2>/dev/null || shasum -a 256 "$f" > "$f.sha256"
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.artifact }}
+          path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/*.tar.gz
+            dist/*.AppImage
+            dist/*.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish draft release
+    needs: package
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Verify packages and checksums
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          for pattern in '*.dmg' '*.zip' '*.tar.gz' '*.AppImage'; do
+            compgen -G "dist/$pattern" >/dev/null || {
+              echo "::error::Missing release package matching $pattern"
+              exit 1
+            }
+          done
+          for f in dist/*.dmg dist/*.zip dist/*.tar.gz dist/*.AppImage; do
+            [ -e "$f" ] || continue
+            [ -f "$f.sha256" ] || {
+              echo "::error::Missing checksum for $f"
+              exit 1
+            }
+          done
+          (cd dist && for f in *.sha256; do sha256sum -c "$f"; done)
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+            if [ "$is_draft" != "true" ]; then
+              echo "::error::Release ${RELEASE_TAG} is already published; refusing to replace its assets."
+              echo "::error::Use a new tag, or unpublish/delete the release before re-running."
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            draft_arg=""
+            if [ "${DRAFT:-true}" != "false" ]; then
+              draft_arg="--draft"
+            fi
+            gh release create "$RELEASE_TAG" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --generate-notes \
+              --title "IMSA WCR M2 Recomp $RELEASE_TAG" \
+              --notes "Playable packages. You still need your own IMSA disc image; the launcher imports it on first run." \
+              $draft_arg
+          fi

@@ -186,3 +186,8 @@ cpack --config build/CPackConfig.cmake -C Release -B dist
 | Windows (MSYS2) | Portable `.zip` with `IMSA WCR M2 Recomp.exe` and `README.txt` at the root, plus `bin/`, `licenses/`, and `userdata/`. Bundles toolchain and FFmpeg DLLs into `bin/`, along with `bin/portable.txt` so saves, settings, and extracted game files stay in `userdata/`. |
 | macOS           | `.dmg` containing a single ad-hoc signed `.app` with bundled dylibs.                                                                                                          |
 | Linux           | Portable `.tar.gz` with `imsa-wcr-m2-recomp` and `README.txt` at the root, plus `bin/`, `lib/`, `share/`, `licenses/`, and `userdata/`. `cmake --install` omits the portable files to produce a `bin`/`lib`/`share` tree; `packaging/appimage/build-appimage.sh <build-dir> <out-dir>` packages that tree into a non-portable AppImage (requires `linuxdeploy` and its GTK plugin). |
+
+To build these packages in GitHub Actions instead, see
+[docs/releasing.md](docs/releasing.md). The workflow downloads the disc image
+from a private repository at build time, verifies it, and publishes a draft
+release; the image is never committed or included in a package.

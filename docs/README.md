@@ -6,6 +6,12 @@
 - `1:166` is host folio 1, ordinal 166. Host folio IDs are listed under [Selector Dispatch Architecture](recompilation/shims.md#selector-dispatch-architecture). Tables that already name a folio may list just the ordinal as `#166`.
 - `.imp3do` module IDs are local to each binary and differ from host folio IDs. Pages label them as module IDs.
 
+## Building and releasing
+
+| Page | Covers |
+| --- | --- |
+| [releasing.md](releasing.md) | Building playable packages in GitHub Actions while keeping the disc image in a private repository. |
+
 ## Game Internals
 
 | Page | Covers |

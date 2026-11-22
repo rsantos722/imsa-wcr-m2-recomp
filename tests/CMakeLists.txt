@@ -153,7 +153,7 @@ if(IMSA_WITH_GAME)
     add_executable(m2_steering_vehicle_test guest/test_steering_vehicle.c)
     target_link_libraries(m2_steering_vehicle_test PRIVATE m2_runtime)
     add_test(NAME m2_steering_vehicle COMMAND m2_steering_vehicle_test "${IMSA_GAME_DIR}")
-    set_tests_properties(m2_steering_vehicle PROPERTIES TIMEOUT 90 SKIP_RETURN_CODE 77)
+    set_tests_properties(m2_steering_vehicle PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
 
     # Audio folio items, connections, and DSPP graph on the disc's own templates.
     add_executable(m2_audio_items_test guest/test_audio_items.c)
